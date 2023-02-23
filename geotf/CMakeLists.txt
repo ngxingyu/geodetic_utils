@@ -1,21 +1,41 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.10)
 project(geotf)
 
-add_definitions(-std=c++11)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(catkin_simple REQUIRED)
-catkin_simple(ALL_DEPS_REQUIRED)
+add_subdirectory(dependencies)
+
+# find dependencies
+find_package(ament_cmake_auto REQUIRED)
+ament_auto_find_build_dependencies()
 
 find_package(GDAL REQUIRED)
 
-cs_add_library(${PROJECT_NAME} src/geodetic_converter.cc)
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} gdal)
 
-cs_add_executable(demo_node src/demo_node.cc)
+ament_auto_add_library(${PROJECT_NAME} src/geodetic_converter.cc)
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} gdal yaml-cpp)
+
+add_executable(demo_node src/demo_node.cc)
 target_link_libraries(demo_node ${PROJECT_NAME})
 
-catkin_add_gtest(geo_tf_test test/test_axis_swaps.cc)
-target_link_libraries(geo_tf_test ${PROJECT_NAME})
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
 
-cs_install()
-cs_export()
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch)
+
+install(TARGETS
+  demo_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+ament_package()
+
+# if(AMENT_ENABLE_TESTING)
+    find_package(ament_cmake_gtest REQUIRED)
+    ament_add_gtest(geo_tf_test test/test_axis_swaps.cc)
+    target_link_libraries(geo_tf_test ${PROJECT_NAME})
+# endif()

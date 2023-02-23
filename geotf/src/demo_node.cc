@@ -1,24 +1,9 @@
 #include <geotf/geodetic_converter.h>
 #include <iomanip> // for std::setprecision()
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 int main(int argc, char* argv[]) {
-  ros::init(argc, argv, "bla");
-  ros::NodeHandle nh;
-
-  /*
-   * Example of how to use geotf
-   * - Lunch using demo.launch
-   */
-
-   /* Read frame configuration from rosparams.
-    * Configred Geo frames in that launch file:
-    *   - ENU_LEE: Enu frame with origin on the LEE terasse at ETH
-    *   - GPS: WGS84 GPS frame (so x=lon, y = lat, z = alt)
-    *   - UTM: UTM 32 North frame (x = easting, y = northing, z = altitude)
-    *   - CH1903+: Swissgrid based on new CH1903+ coordinates and Landesvermessung 95.
-    */
-  geotf::GeodeticConverter converter;
-  converter.initFromRosParam();
+  rclcpp::init(argc, argv);
+  auto converter = std::make_shared<geotf::GeodeticConverter>();
 
   // Wait for TF to setup
   sleep(1.0);
@@ -31,44 +16,48 @@ int main(int argc, char* argv[]) {
   eth_mainbuilding_utm << 465882.064, 5247094.385, 498.217;
 
   // Output ETH mainbuilding in GPS frame
-  if (converter.canConvert("UTM", "GPS")) {
-    converter.convert("UTM", eth_mainbuilding_utm,
+  if (converter->canConvert("UTM", "GPS")) {
+    converter->convert("UTM", eth_mainbuilding_utm,
                       "GPS", &eth_mainbuilding_gps);
 
-    ROS_INFO_STREAM("ETH Mainbuilding WGS84 = " << std::setprecision(16)
-                                                << eth_mainbuilding_gps);
+    RCLCPP_INFO_STREAM(converter->get_logger(),
+      "ETH Mainbuilding WGS84 = \n" << std::setprecision(16)
+                                  << eth_mainbuilding_gps);
 
   } else {
-    ROS_WARN_STREAM("Frames not loaded.");
+    RCLCPP_WARN_STREAM(converter->get_logger(), "Frames not loaded.");
   }
 
   // Output ETH mainbuilding in Swissgrid frame
-  if (converter.canConvert("UTM", "CH1903+")) {
-    converter.convert("UTM", eth_mainbuilding_utm,
+  if (converter->canConvert("UTM", "CH1903+")) {
+    converter->convert("UTM", eth_mainbuilding_utm,
                       "CH1903+", &eth_mainbuilding_ch);
 
-    ROS_INFO_STREAM("ETH Mainbuilding CH1903+/LV95 = " << std::setprecision(16)
-                                                       << eth_mainbuilding_ch);
+    RCLCPP_INFO_STREAM(converter->get_logger(),
+      "ETH Mainbuilding CH1903+/LV95 = \n" << std::setprecision(16)
+        << eth_mainbuilding_ch);
 
   } else {
-    ROS_WARN_STREAM("Frames not loaded.");
+    RCLCPP_WARN_STREAM(converter->get_logger(), "Frames not loaded.");
   }
 
   // Output ETH mainbuilding in ENU frame based on LEE terasse
-  if (converter.canConvert("UTM", "ENU_LEE")) {
-    converter.convert("UTM", eth_mainbuilding_utm,
+  if (converter->canConvert("UTM", "ENU_LEE")) {
+    converter->convert("UTM", eth_mainbuilding_utm,
                       "ENU_LEE", &eth_mainbuilding_enu);
 
-    ROS_INFO_STREAM("ETH Mainbuilding in ENU Frame based on LEE Terasse = "
+    RCLCPP_INFO_STREAM(converter->get_logger(),
+      "ETH Mainbuilding in ENU Frame based on LEE Terasse = \n"
                         << std::setprecision(16)
                         << eth_mainbuilding_enu);
 
   } else {
-    ROS_WARN_STREAM("Frames not loaded.");
+    RCLCPP_WARN_STREAM(converter->get_logger(), "Frames not loaded.");
   }
 
 
-  ROS_INFO_STREAM("Please start rviz for visualization and press enter.");
+  RCLCPP_INFO_STREAM(converter->get_logger(),
+    "Please start rviz for visualization and press enter.");
   std::cin.get();
 
   // Example of directly converting TF locations into geo locations
@@ -81,11 +70,11 @@ int main(int argc, char* argv[]) {
 
   Eigen::Affine3d body_coords(Eigen::Affine3d::Identity());
   Eigen::Affine3d utm_body_coords(Eigen::Affine3d::Identity());
-  converter.convertFromTf("body",
+  converter->convertFromTf("body",
                           body_coords,
                           "UTM",
                           &utm_body_coords);
-  ROS_INFO_STREAM("UTM coordinates of body origin:");
+  RCLCPP_INFO_STREAM(converter->get_logger(), "UTM coordinates of body origin:");
   std::cout << utm_body_coords.translation() << std::endl;
 
 
@@ -96,30 +85,28 @@ int main(int argc, char* argv[]) {
   utm_building_point.translation().x() = 465727;
   utm_building_point.translation().y() = 5247291;
   utm_building_point.translation().z() = 489.619;
-  std::cout << converter.publishAsTf("UTM", utm_building_point, "CornerUTM") << std::endl;
+  std::cout << converter->publishAsTf("UTM", utm_building_point, "CornerUTM") << std::endl;
 
   // Publish TF Frame CornerGPS based on UTM coordinates
   Eigen::Affine3d gps_building_point(Eigen::Affine3d::Identity());
   gps_building_point.translation().x() = 47.37823;
   gps_building_point.translation().y() = 8.54616;
   gps_building_point.translation().z() = 489.619;
-  converter.publishAsTf("GPS", gps_building_point, "CornerGPS");
+  converter->publishAsTf("GPS", gps_building_point, "CornerGPS");
 
   // Publish TF Frame CornerENU based on ENU coordinates
   Eigen::Affine3d ENU_building_point(Eigen::Affine3d::Identity());
   ENU_building_point.translation().x() = 14.58;
   ENU_building_point.translation().y() = 6.64;
   ENU_building_point.translation().z() = 0.0;
-  converter.publishAsTf("ENU_LEE", ENU_building_point, "CornerENU");
+  converter->publishAsTf("ENU_LEE", ENU_building_point, "CornerENU");
 
   // Publish TF Frame CornerCH based on CH1903+ coordinates
   Eigen::Affine3d CH_building_point(Eigen::Affine3d::Identity());
   CH_building_point.translation().x() = 2683625.9;
   CH_building_point.translation().y() = 1248088.9;
   CH_building_point.translation().z() = 442.4;
-  converter.publishAsTf("CH1903+", CH_building_point, "CornerCH");
-
-  ros::spin();
+  converter->publishAsTf("CH1903+", CH_building_point, "CornerCH");
 
   return 0;
 }

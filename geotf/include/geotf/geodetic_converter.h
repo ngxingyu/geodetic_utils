@@ -10,27 +10,28 @@
 #include <gdal/gdal_version.h>
 #include <iostream>
 #include <Eigen/Dense>
-#include <boost/optional.hpp>
+#include <optional>
 #include <vector>
 #include <memory>
 #include <map>
-#include <tf/transform_listener.h>
-#include <tf/transform_broadcaster.h>
-#include <ros/ros.h>
-#include <tf_conversions/tf_eigen.h>
+#include <rclcpp/time.hpp>
+#include <rclcpp/logging.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <rclcpp/rclcpp.hpp>
+#include <tf2_eigen/tf2_eigen.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace geotf {
-class GeodeticConverter {
+class GeodeticConverter : public rclcpp::Node {
   typedef std::shared_ptr<OGRSpatialReference> OGRSpatialReferencePtr;
   typedef std::shared_ptr<OGRCoordinateTransformation>
       OGRCoordinateTransformationPtr;
   typedef std::pair<std::string, std::string> TransformId;
 
  public:
-   GeodeticConverter();
-
-  // Initialize frame definitions from rosparams
-  void initFromRosParam(const std::string& prefix = "/geotf");
+   explicit GeodeticConverter();
 
   // Adds a coordinate frame by its EPSG identifier
   // see https://spatialreference.org/ref/epsg/
@@ -92,14 +93,14 @@ class GeodeticConverter {
                    const Eigen::Affine3d& input,
                    const std::string& tf_output_frame,
                    Eigen::Affine3d* output,
-                   const ros::Time& time = ros::Time(0.0)) ;
+                   const rclcpp::Time& time = rclcpp::Time(0.0)) ;
 
   // Convets a Pose in a TF to a pose in a Geo frame
   bool convertFromTf(const std::string& tf_input_frame,
                      const Eigen::Affine3d& input,
                      const std::string& geo_output_frame,
                      Eigen::Affine3d* output,
-                     const ros::Time& time = ros::Time(0.0)) ;
+                     const rclcpp::Time& time = rclcpp::Time(0.0)) ;
 
   // Publishes a geolocation as a tf frame
   bool publishAsTf(const std::string& geo_input_frame,
@@ -135,10 +136,11 @@ class GeodeticConverter {
   // Defines that these two frames (on a geo frame, on a tf frame)
   // are equal an can be used for geo<->TF conversions
   // Note: Geoframe must be a cartesian frame.
-  boost::optional< std::pair<std::string, std::string>>  tf_mapping_;
+  std::optional<std::pair<std::string, std::string>>  tf_mapping_;
 
-  std::shared_ptr<tf::TransformListener> listener_;
-  std::shared_ptr<tf::TransformBroadcaster> broadcaster_;
+  std::unique_ptr<tf2_ros::Buffer> buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> listener_;
+  std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
 
 };
 }
